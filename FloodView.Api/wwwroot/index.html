@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FloodView | Monitoramento</title>
+<style>
+:root{color-scheme:dark;--bg:#07141f;--panel:#0d2130;--line:#234052;--text:#eef7fa;--muted:#a0b7c3;--aqua:#5ae6d2}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 90% 0,#153c48,#07141f 56%);color:var(--text);font:16px/1.5 "Segoe UI",Arial,sans-serif}
+main{max-width:1120px;margin:auto;padding:32px 22px 48px}
+header,.row,.charthead{display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap}
+.brand{font-weight:750;font-size:23px;letter-spacing:-.5px}.mark{display:inline-grid;place-items:center;width:38px;height:38px;margin-right:9px;background:var(--aqua);border-radius:12px;color:#06262b;font-size:25px;vertical-align:middle}
+h1{font-size:clamp(37px,6vw,60px);letter-spacing:-.055em;line-height:1.05;margin:48px 0 10px}
+h2{font-size:20px;letter-spacing:-.025em;margin:0}p{margin:0;color:var(--muted)}
+#connection{display:flex;align-items:center;gap:9px;color:#86e9ac}.dot{width:9px;height:9px;border-radius:50%;background:#65dfa0;box-shadow:0 0 13px #65dfa088}.dot.off{background:#ff8294;box-shadow:0 0 13px #ff829488}
+.grid{display:grid;grid-template-columns:minmax(230px,.78fr) minmax(0,1.55fr);gap:16px;margin-top:22px}
+.card{min-width:0;border:1px solid var(--line);border-radius:19px;background:var(--panel);padding:22px}
+.measure{min-height:295px;display:flex;flex-direction:column;justify-content:space-between}
+.value{font-size:clamp(55px,9vw,82px);font-weight:750;letter-spacing:-.07em;line-height:1.1;margin:22px 0 14px}.unit{font-size:22px;color:var(--muted);font-weight:500;letter-spacing:0}
+.badge{display:inline-block;border:1px solid #496171;border-radius:999px;padding:5px 12px;color:var(--muted)}
+.badge.normal{color:#83edac;border-color:#35805b}.badge.warning{color:#ffd27b;border-color:#9b7736}.badge.danger{color:#ff98aa;border-color:#a64b5f}
+#detail{font-size:14px}.chart{min-height:295px}canvas{display:block;width:100%;height:225px;margin-top:15px}
+.settings{margin-top:16px}.fields{display:flex;gap:14px 22px;flex-wrap:wrap;margin-top:17px}.fields label{display:grid;gap:5px;font-size:14px;color:var(--muted)}
+input{width:120px;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:#091a27;color:var(--text);font:inherit}
+input:focus{outline:2px solid var(--aqua);outline-offset:2px}
+.note{font-size:13px;margin-top:13px}
+@media(max-width:700px){main{padding:22px 14px 35px}.grid{grid-template-columns:1fr}.measure,.chart{min-height:235px}.card{padding:17px}h1{margin-top:32px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div class="brand"><span class="mark" aria-hidden="true">≈</span>FloodView</div>
+  <div id="connection" role="status"><span class="dot"></span>Conectando à API…</div>
+</header>
+<h1>Nível da água</h1>
+<p>Leituras do dispositivo atualizadas automaticamente.</p>
+<div class="grid">
+  <section class="card measure">
+    <div><h2>Medição atual</h2><div class="value"><span id="level">—</span> <span class="unit">cm</span></div><span id="badge" class="badge">Aguardando leituras</span></div>
+    <p id="detail">Distância do sensor —</p>
+  </section>
+  <section class="card chart">
+    <div class="charthead"><h2>Histórico recente</h2><p>Últimas 60 medições</p></div>
+    <canvas id="chart" aria-label="Gráfico do nível da água em centímetros"></canvas>
+  </section>
+</div>
+<section class="card settings">
+  <h2>Calibração e alertas</h2>
+  <div class="fields">
+    <label>Distância com pote vazio (cm)<input id="empty" type="number" min="2" max="400" step="0.1" value="26"></label>
+    <label>Atenção a partir de (cm)<input id="warning" type="number" min="0.1" step="0.1" value="5"></label>
+    <label>Alerta a partir de (cm)<input id="danger" type="number" min="0.1" step="0.1" value="10"></label>
+  </div>
+  <p class="note">A altura é calculada como distância do pote vazio menos distância atual. Os valores acima ficam salvos neste navegador.</p>
+</section>
+</main>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const ui = {connection:$("connection"),level:$("level"),badge:$("badge"),detail:$("detail"),chart:$("chart"),empty:$("empty"),warning:$("warning"),danger:$("danger")};
+const ctx = ui.chart.getContext("2d");
+const fmt = new Intl.NumberFormat("pt-BR",{minimumFractionDigits:1,maximumFractionDigits:1});
+const deviceId = 1;
+let readings = [];
+let apiAvailable = false;
+for (const input of [ui.empty,ui.warning,ui.danger]) {
+  const saved = localStorage.getItem("floodview-"+input.id);
+  if (saved !== null) input.value = saved;
+  input.addEventListener("input", () => {
+    localStorage.setItem("floodview-"+input.id,input.value);
+    render();
+  });
+}
+function levelFrom(distance) {
+  return Math.max(0,Number(ui.empty.value)-distance);
+}
+function statusFor(level) {
+  const warning=Number(ui.warning.value),danger=Number(ui.danger.value);
+  if (!ui.warning.value||!ui.danger.value||warning<=0||danger<=warning) return ["Confira os limites",""];
+  if(level>=danger)return ["Alerta","danger"];
+  if(level>=warning)return ["Atenção","warning"];
+  return ["Normal","normal"];
+}
+function render() {
+  const latest=readings[readings.length-1];
+  ui.connection.innerHTML=apiAvailable?'<span class="dot"></span>API conectada · dispositivo 1':'<span class="dot off"></span>API sem conexão';
+  if(!latest) {
+    ui.level.textContent="—";ui.badge.textContent="Aguardando leituras";ui.badge.className="badge";
+    ui.detail.textContent=apiAvailable?"Nenhuma leitura recebida ainda.":"Confira se a API está rodando.";
+    draw();return;
+  }
+  const level=levelFrom(latest.distanciaCm);
+  const [label,tone]=statusFor(level);
+  ui.level.textContent=fmt.format(level);
+  ui.badge.textContent=label;ui.badge.className="badge "+tone;
+  const time=new Date(latest.recebidaEmUtc).toLocaleTimeString("pt-BR");
+  ui.detail.textContent="Distância "+fmt.format(latest.distanciaCm)+" cm · recebido às "+time;
+  draw();
+}
+function draw() {
+  const w=ui.chart.clientWidth,h=ui.chart.clientHeight,scale=window.devicePixelRatio||1;
+  if(!w||!h)return;
+  ui.chart.width=Math.round(w*scale);ui.chart.height=Math.round(h*scale);ctx.setTransform(scale,0,0,scale,0,0);
+  const left=39,right=w-10,top=12,bottom=h-25;
+  const values=readings.map(r=>levelFrom(r.distanciaCm));
+  const max=Math.max(4,Math.ceil(Math.max(0,...values)/4)*4);
+  ctx.font="12px Segoe UI, Arial";ctx.lineWidth=1;ctx.strokeStyle="#234052";ctx.fillStyle="#a0b7c3";
+  for(let i=0;i<=4;i++){const y=bottom-(bottom-top)*i/4;ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(right,y);ctx.stroke();ctx.fillText(fmt.format(max*i/4),2,y+4);}
+  if(!values.length){ctx.textAlign="center";ctx.fillText("O gráfico aparece quando chegarem leituras",(left+right)/2,h/2);return;}
+  ctx.strokeStyle="#5ae6d2";ctx.fillStyle="#5ae6d2";ctx.lineWidth=2.5;ctx.beginPath();
+  let x=left,y=bottom;
+  values.forEach((value,i)=>{x=left+(right-left)*i/Math.max(1,values.length-1);y=bottom-(bottom-top)*value/max;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);});
+  ctx.stroke();ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fill();
+}
+async function update() {
+  try{
+    const response=await fetch("/api/dispositivos/"+deviceId+"/leituras?limite=60",{cache:"no-store"});
+    if(!response.ok)throw new Error("HTTP "+response.status);
+    const data=await response.json();
+    readings=data.slice().reverse().filter(x=>Number.isFinite(Number(x.distanciaCm)));
+    apiAvailable=true;
+  }catch{apiAvailable=false;}
+  render();
+}
+new ResizeObserver(draw).observe(ui.chart);
+update();setInterval(update,2000);
+</script>
+</body>
+</html>

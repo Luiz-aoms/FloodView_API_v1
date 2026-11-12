@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.11.35312.102
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FloodView.Api", "FloodView.Api\FloodView.Api.csproj", "{939E0BC3-7C6A-40E9-9576-89A62C09272E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FloodView.Ponte", "FloodView.Ponte\FloodView.Ponte.csproj", "{C03158B8-A875-4692-8806-080C35EAFC9F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{939E0BC3-7C6A-40E9-9576-89A62C09272E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{939E0BC3-7C6A-40E9-9576-89A62C09272E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{939E0BC3-7C6A-40E9-9576-89A62C09272E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{939E0BC3-7C6A-40E9-9576-89A62C09272E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C03158B8-A875-4692-8806-080C35EAFC9F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C03158B8-A875-4692-8806-080C35EAFC9F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C03158B8-A875-4692-8806-080C35EAFC9F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C03158B8-A875-4692-8806-080C35EAFC9F}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {5DC89FF0-CB8C-4D25-9AB1-0EADDBE25F16}
+	EndGlobalSection
+EndGlobal
